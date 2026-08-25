@@ -32,9 +32,11 @@ jobs:
             echo "Tag $TAG_VERSION != package.json $PKG_VERSION" >&2
             exit 1
           fi
+      # Build first — @vitrinka/expo resolves @vitrinka/redact through its
+      # build output (main/types point at build/), same order as ci.yml.
+      - run: bun run build
       - run: bun run typecheck
       - run: bun run test
-      - run: bun run build
       - name: Publish
         working-directory: packages/expo
         run: npm publish --provenance --access public
