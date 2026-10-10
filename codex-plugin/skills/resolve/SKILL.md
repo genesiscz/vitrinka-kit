@@ -5,7 +5,7 @@ metadata:
   vitrinka-contract: "2026-09-15"
 ---
 
-# /vitrinka:resolve — work a board's backlog properly
+# resolve — work a board's backlog properly
 
 An ACCUMULATED backlog: the user swept their app, dropped dozens of
 annotations on a board, and handed you the whole set. Failure modes this
@@ -14,15 +14,15 @@ skill prevents:
 1. **Fixing annotations one-by-one in board order** — a 65-item board is
    usually 8–12 real workstreams; five items saying "use the glass chips
    here" are ONE rollout.
-2. **Fetching everything up front** — `get {kind:"annotation"}` × 65 and full-board
-   scrapes burn tens of thousands of tokens.
+2. **Fetching everything up front** — `get {kind:"annotation"}` × 65 and
+   full-board scrapes burn tens of thousands of tokens.
 3. **Reading crop images into the main context.**
 4. **Fixing without resolving** — every item ends with proof + status.
 
 Argument: a board slug (`/vitrinka:resolve testing-11-7`). Without one,
-auto-scope to this repo + branch the same way `/vitrinka:listen` does. NEVER
-call `list {kind:"work"}` unscoped — the global firehose contains other sessions'
-work.
+auto-scope to this repo + branch the same way `vitrinka:listen` does. NEVER
+call `list {kind:"work"}` unscoped — the global firehose contains other
+sessions' work.
 
 ## Phase 0 — one call for the whole picture
 
@@ -34,8 +34,8 @@ work.
   (drafts the user hasn't dispatched yet — NEVER work a staged item), plus
   `resolved`/`in_review` history and `working` items another live session
   has claimed. Open is yours; the rest is not.
-- Do NOT loop `get {kind:"annotation"}` over the queue; enrichment is Phase 2,
-  selective and batched.
+- Do NOT loop `get {kind:"annotation"}` over the queue; enrichment is Phase
+  2, selective and batched.
 - Do NOT `scrape_board` for a backlog pass. Reach for it (with `section`)
   only when an annotation explicitly concerns journey ordering or a whole
   section.
@@ -48,7 +48,7 @@ Classify each item BEFORE fetching anything else:
 |---|---|---|
 | **Self-contained** | Names files/routes/components (`apps/client/...`, `/marketplace-filters`), the action is unambiguous | none — the prompt IS the brief |
 | **Ambiguous target** | "this", "here", "this screen", no file named | crop (batched, Phase 2) |
-| **Referenced** | Contains `⌖E…` tokens | `get {kind:"annotation"}` — refs are deliberate user pointing and rank ABOVE the implicit crop context; each ref carries its own `cropUrl` |
+| **Referenced** | Contains `⌖E…` tokens | `get {kind:"annotation"}` — refs are deliberate user pointing and rank ABOVE the implicit crop context; each ref carries its own region |
 | **Conversational** | A thread already exists / prompt was revised | `get {kind:"capsule"}` — latest revision + thread tail; escalate to the full brief only for file attachments |
 
 `intent` changes the deliverable:
@@ -78,17 +78,13 @@ Target 3–8 items per block, cross-cutting blocks FIRST. Record the block map
 (annotation ids per block) in your task tracker.
 
 Batched enrichment for everything flagged in Phase 1: spawn **ONE subagent**
-with the full list of ambiguous ids. It fetches crops + ref crops
-(`get {kind:"annotation"}` for refs/threads, direct crop URLs otherwise) and returns
-TEXT: `id → screen identification (quote visible labels verbatim) → what the
-markup circles → what each ⌖E ref points at`. Images never enter your
-context.
-
-Crop URLs are relative paths and always need auth (an unauthenticated fetch
-401s) — `Authorization: Bearer` with the token from `$VITRINKA_TOKEN`
-(fallback: the credential `vitrinka auth token` prints). Feed the header via
-stdin: `printf 'Authorization: Bearer %s' "$TOKEN" | curl -H @- <url>` —
-never paste the token inline into a command's arguments.
+with the full list of ambiguous ids. It sees each crop through
+`get_card_image {annotation: "<workspace>/<id>"}` (a ref's pointed-at
+region through `get_card_image {board, cardId, region}`) and
+`get {kind:"annotation"}` for refs/threads, and returns TEXT: `id → screen
+identification (quote visible labels verbatim) → what the markup circles →
+what each ⌖E ref points at`. Images never enter your context; a crop is
+never fetched by URL.
 
 ## Phase 3 — execute block by block
 
@@ -108,8 +104,9 @@ never paste the token inline into a command's arguments.
 - An item that genuinely needs the user's input: `reply` with the question,
   put it back with `set_status {status: "open"}`, list it in your end-of-run
   summary, and move on — the user's thread reply re-queues it. When the
-  ambiguity is spatial ("which element?"), `highlight` a rectangle on the
-  card so the question points at something.
+  ambiguity is spatial ("which element?"), `highlight` (a `rare` door —
+  callable by name) a rectangle on the card so the question points at
+  something.
 
 ## Phase 4 — verify, then resolve on the board
 
@@ -134,14 +131,16 @@ Then close the loop, per item:
 3. `set_status` → `in_review`. **Never `resolved`** — the user's accept,
    taken on the board.
 4. An item filed from an Eve review job (it carries `jobId` /
-   `judgmentIndex`): `POST /api/v1/review/jobs/{id}/verify {cardId,
-   cardVersion}` links the proof so the post-fix audit runs, then
-   `review_judge {board, journey}` re-reads the pass for regressions.
+   `judgmentIndex`): `review_verify {job, cardId, cardVersion,
+   judgmentIndex}` links the proof (a newer version than the judged one;
+   `cardVersion` from `get_card_image`) so the post-fix audit runs, then
+   `review_judge {board, journey}` (a `rare` door) re-reads the pass for
+   regressions and `review_judgments {board}` reads the verdicts.
    Resolution is evidence, never automatic usefulness points.
 
 Batch these calls per block, right after the block's verification —
 not per-edit and not all at session end. Before the hand-back on a bound
-task, run the `handoff` skill (`hand_back`) — the chat block is its
+task, run `vitrinka-pm:handoff` (`hand_back`) — the chat block is its
 `rendered` output.
 
 ## Token & API economy

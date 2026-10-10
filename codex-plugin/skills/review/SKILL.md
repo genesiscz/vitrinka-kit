@@ -1,16 +1,17 @@
 ---
 name: review
-description: "Use when asked to review a vitrinka board's screens or a journey pass for defects from the app's repo — 'review the board', 'review this journey', '/vitrinka:review [board] [journey] [eve]', 'have Eve review it'; fixing what the board accepts is resolve, live human annotations are listen."
+description: "Use when asked to review a vitrinka board's screens or a journey pass for defects — 'review the board', 'review this journey', '/vitrinka-qa:review [board] [journey] [eve]', 'have Eve review it'; fixing accepted findings is resolve, live human annotations are listen."
 metadata:
   vitrinka-contract: "2026-09-15"
 ---
 
-# /vitrinka:review — file findings, never fix
+# /vitrinka-qa:review — file findings, never fix
 
 Two modes, chosen by the trailing argument. They never mix in one run, and
 neither touches the repo: a review ends when its findings sit `staged` on
 the board for the user's Accept/Dismiss. Fixing accepted findings is
-`/vitrinka:resolve`, a separate run the user starts.
+`vitrinka:resolve`, a separate run the user starts. A human types
+`/review`; Codex `$review`.
 
 - **local (default)** — YOU are the reviewer. You read the screens with
   your own eyes, judge them against the team's review brief and file
@@ -35,35 +36,29 @@ Failure modes this skill prevents:
    never files `annotate` items of its own.
 
 Arguments: a board slug, optionally a journey key, optionally the word
-`eve` last (`/vitrinka:review acme-audit checkout`, `/vitrinka:review
-acme-audit checkout eve`). Without a journey, review the whole board or ask
-which section when the board has several.
+`eve` last (`/review acme-audit checkout`, `/review acme-audit checkout
+eve`). Without a journey, review the whole board or ask which section when
+the board has several.
 
 ## Phase 0 — orient, one call each
 
-1. `list {kind:"section", board}` — `journeys[]` is the map: each chain's key,
-   pass count, latest pass. Pick the scope here.
+1. `list {kind: "section", board}` — `journeys[]` is the map: each chain's
+   key, pass count, latest pass. Pick the scope here.
 2. `review_brief {project, persona?}` (CLI `vitrinka review brief
    [--project acme] [--persona "a senior mobile designer"]`) — the team's
    resolved rules (built-in ▸ workspace ▸ this project) as one prompt
    block. Both modes judge against THIS, never a rubric you retype. A rule
    that keeps misfiring is fixed at its source: `vitrinka review rules get
    <id>`, edit, `vitrinka review rules lint --fix <file>`, `vitrinka review
-   rules put <file>` (admin+; the rule format is docs topic `review`).
-3. `eve` mode only: `GET /api/v1/boards/{slug}/review-passes` — pass
-   history with per-state finding tallies. A pass already `running` means
-   STOP and wait (a second request 409s). A recent `failed` with a timeout
-   error after a deploy window — re-request.
-
-Every API call needs an `Authorization: Bearer` header (token from
-`$VITRINKA_TOKEN`, fallback the credential `vitrinka auth token` prints;
-`vitrinka auth login` mints it), fed via stdin (`printf 'Authorization:
-Bearer %s' "$TOKEN" | curl -H @- <url>`) — never inline the token into a
-command's arguments.
+   rules put <file>` (the rule format is `docs {topic: "review"}`).
+3. `eve` mode only: `review_judgments {board}` — the board's jobs with
+   their states and per-rule triage. A job still `running` means STOP and
+   wait (a second request 409s). A recent `failed` with a timeout error
+   after a deploy window — re-request.
 
 ## Phase 1 (local) — review the screens yourself
 
-1. Survey the set with `get_card_image {board, cardIds:[…]}` — one
+1. Survey the set with `get_card_image {board, cardIds: […]}` — one
    labelled sheet per call (≤12 cards): cross-cutting problems (one
    contrast token, one spacing scale) show up only across the set. Then
    `get_card_image {board, cardId}` for every screen you will file on and
@@ -72,18 +67,21 @@ command's arguments.
    command, no image files written to build your own montage — that is
    what the sheet is for. In a code-mode script, hand the image block to
    the host's image call (`image(block)`) and print only the text block;
-   never stringify or log the whole result.
+   never stringify or log the whole result. A first sheet that arrives as
+   `[image omitted]` means this host sees no tool-result images (a Codex
+   lane): stop there, file nothing, and offer a rerun in a Claude session
+   or as `eve`.
 2. Judge each screen against the brief from Phase 0. Every finding names
    the rule it breaks, the region on the image, and what correct looks
    like. Sort into `finding` (a defect) and `suggestion` (taste).
-3. File ONE `annotate {board, agent, items:[{key, cardId, cardVersion,
-   region, image:{width,height}, summary, detail, category, severity}]}`
+3. File ONE `annotate {board, agent, items: [{key, cardId, cardVersion,
+   region, image: {width, height}, summary, detail, category, severity}]}`
    batch for the whole scope — `image` is the size that read returned, so
    a region measured on another basis is refused instead of landing wrong.
    Read `covers` in each receipt: it lists the text under the filed region.
    Findings land `staged` for the user's Accept/Dismiss. Never file
    findings as document or `finding` cards via compose_board, never
-   `highlight` them. Doctrine: docs topic `annotation`.
+   `highlight` them. Doctrine: `docs {topic: "annotation"}`.
 
 Nothing here calls a server-side reviewer; the findings are yours and the
 report says so.
@@ -95,15 +93,12 @@ report says so.
 reviewer context (prefer it whenever a chain exists). CLI: `vitrinka review
 judge <board> [--rules a,b] [--model model]`. For a published set: `vitrinka
 review judge <project>/<branchSlug>/<selector> --set` or `review_judge
-{set:"project/branchSlug/selector"}`. The server resolves an existing board;
-never invent one when the set is unowned or ambiguous. Immediate processing
-is the default; `--batch` explicitly opts into waiting. `--calibration`
-audits a sample of passing judgments to measure missed issues. The old board
-reviewer is replaced, including the `request_review` compatibility door.
-`review_judge`, `review_job`, `review_stats` and `request_review` live in
-the `rare` module — never listed by default; the registration opts in on
-its `/mcp` URL: `?modules=core,pm,qa,me,rare` (naming modules lists only
-those, so name every one you keep).
+{set: "project/branchSlug/selector"}`. The server resolves an existing
+board; never invent one when the set is unowned or ambiguous. Immediate
+processing is the default; `batch` explicitly opts into waiting;
+`calibration` audits a sample of passing judgments to measure missed
+issues. `review_judge`, `review_job` and `review_stats` are rare-tier doors
+— callable by name whether or not they are listed.
 
 A pass requested without `instructions` receives the rendered brief
 automatically. To steer it, tweak the Phase 0 block's focus and pass the
@@ -115,22 +110,26 @@ result as `instructions` (≤ 12 000 chars).
   screens were never pushed. Fix the scope, don't retry blind.
 
 Poll `review_judgments {board}` (CLI `vitrinka review judge <board>
---status`) until the pass is `completed` (or `failed`) — minutes, not
+--status`) until the job is `completed` (or `failed`) — minutes, not
 seconds; check in with the user rather than spinning hot.
 
 Then read: `review_judgments {board}` returns jobs, version-pinned
 judgments, independent audit assessments and per-rule triage.
 `cannot_judge` remains unresolved; missing evidence is never a pass. Read
-bounded evidence crops only as needed. Each failed judgment is automatically
-audited; a supported finding still needs explicit selection to file (`POST
-/api/v1/review/jobs/{id}/file {index}`) — the board review pane provides
-that selection and human usefulness feedback. For local triage, `vitrinka
-review judge export <job>` prints `judgments.json` (`--candidates` selects
-mechanical candidates); MCP `review_job` supports `export_judgments` and
-`export_candidates`. Mark selected rows `keep:true`, then use `review file`
-with the exported `judge/<model>` agent. Preserve `jobId`,
-`judgmentIndex`, card and version fields: they link later fix evidence back
-to the original review and keep filing idempotent with the UI.
+bounded evidence crops only as needed (`get_card_image {board, cardId,
+region}`). Each failed judgment is automatically audited; a supported
+finding still needs explicit selection to file — `review_job {id,
+operation: "file", index}` carries a human's decision (the board review
+pane is where they make it). For local triage, `vitrinka review judge
+export <job>` prints `judgments.json` (`--candidates` selects mechanical
+candidates); `review_job {id, operation: "export_judgments" |
+"export_candidates"}` is the MCP twin. Mark selected rows `keep: true`,
+then `vitrinka review file <board> <candidates.json> --agent judge/<model>`.
+Preserve `jobId`, `judgmentIndex`, card and version fields: they link later
+fix evidence back to the original review and keep filing idempotent with
+the UI. After a fix lands, `review_verify {job, cardId, cardVersion,
+judgmentIndex}` links the fresh capture to the failed judgment so the audit
+re-runs — that is `resolve`'s step, never a review run's.
 
 **Re-verify every finding against the code before you report it as real.**
 Eve proposes; you confirm or refute. A finding that's wrong gets a line in
@@ -140,9 +139,9 @@ its own pass.
 
 ## Phase 2 — group by root cause
 
-Group the whole set at once by root cause, the way `/vitrinka:resolve`
-triages — five contrast findings on five screens are ONE token problem, and
-the report says so, so the user can Accept or Dismiss a block instead of a
+Group the whole set at once by root cause, the way `resolve` triages —
+five contrast findings on five screens are ONE token problem, and the
+report says so, so the user can Accept or Dismiss a block instead of a
 scatter. `kind: suggestion` is taste and is labelled as such; `refuted` is
 context only; `severity` orders the report. The grouping is words in the
 report, never a commit.
@@ -153,17 +152,16 @@ One summary to the user (and to the board as a `callout` card when the
 session is board-first): which mode ran, findings filed grouped by root
 cause, findings you believe are wrong (with evidence, for their dismiss
 click), suggestions left for their call. Before the hand-back on a bound
-task, run the `handoff` skill (`hand_back`) — the chat block is its
+task, run `vitrinka-pm:handoff` (`hand_back`) — the chat block is its
 `rendered` output.
 
 End with an explicit board ask to Accept or Dismiss the staged findings (the
 card's Accept all / Dismiss all controls support batches) and name
-`/vitrinka:resolve` as the run that fixes what they accept. Never invent
-verdicts to improve metrics. `vitrinka review stats --since 90d [--project
-<slug>]` or `review_stats {since:"90d", project?}` shows filed, accepted,
-dismissed and still-staged counts per rule and agent/model.
-`dismissRate:null` means nobody decided yet; it is not a zero-percent
-rejection rate.
+`resolve` as the run that fixes what they accept. Never invent verdicts to
+improve metrics. `vitrinka review stats --since 90d [--project <slug>]` or
+`review_stats {since: "90d", project?}` shows filed, accepted, dismissed
+and still-staged counts per rule and agent/model. `dismissRate: null`
+means nobody decided yet; it is not a zero-percent rejection rate.
 
 ## Don't rationalize
 
@@ -181,14 +179,15 @@ rejection rate.
 
 ## Red flags — STOP
 
-- A local run is calling `review_judge`, polling passes, or naming Eve.
+- A local run is calling `review_judge`, polling jobs, or naming Eve.
 - An `eve` run is filing `annotate` items of its own.
-- You are about to PATCH an ai-annotation's `state`.
+- You are about to set a finding's verdict (`review_job feedback`, a
+  state change) — that is the user's click.
 - You are editing repo code, running a capture or composing a pass — that
-  is `/vitrinka:resolve`, after the user's verdict.
+  is `resolve`, after the user's verdict.
 - You are reporting as real a finding you never located in the code.
 - Your findings are document cards or a compose_board `finding` instead of
   `annotate` items with regions on the actual screenshots.
-- A pass is `running` and you're requesting another.
-- You've read findings one HTTP call at a time instead of the one
-  board-level GET.
+- A job is `running` and you're requesting another.
+- You've read findings one job at a time instead of the one
+  `review_judgments {board}` read.

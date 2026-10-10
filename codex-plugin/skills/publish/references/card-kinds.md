@@ -1,8 +1,9 @@
 # card kinds — index + doctrine (shapes live in the docs verb)
 
 Payload shapes are NOT in this file: call the `docs` MCP tool (no topic →
-the index; `docs {topic:"<kind>"}` → the contract with an example) or
-`vitrinka docs <kind>` — generated from the validator; trust it over anything
+the index; `docs {topic:"<kind>"}` → the contract with an example;
+`"board:<kind>"` / `"element:<kind>"` when a name collides) or `vitrinka
+docs <topic>` — generated from the validator; trust it over anything
 remembered. The vocabulary is **canonical-only**: the retired
 `viz`/`wireframe` kind NAMES and their legacy payload shapes are both
 rejected at every door with a 400 naming the canonical kind — compose
@@ -87,7 +88,8 @@ board card, nested inside a fractal `doc`, and full-screen at its solo
   relation: after|before|under|beside|into}`, batch-level or per card), never
   coordinates — `docs {topic:"board:composing"}`.
 - Payload mismatches 400 with `{code, index}` naming the bad item and a `see`
-  pointer into the docs tree — follow it.
+  pointer into the docs tree — follow it. `undo {board}` reverts your last
+  batch when the receipt reads wrong.
 - Kinds with a whole workflow of their own: `diagram` and `page` → the
   **artifact** skill's references (quality loop, imports, round-trip, deep
   links).

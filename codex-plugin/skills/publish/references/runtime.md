@@ -3,12 +3,13 @@
 The server vendors a pinned, immutable library set at `/vendor/…` so an
 artifact (full `html` document or a scaffolded report) uses real libraries
 WITHOUT bundling, CDNs, or hand-rolled code. Everything is CORS-enabled and
-CSP-compatible (artifact iframes are opaque-origin — /vendor/* responds with
-Access-Control-Allow-Origin: *; no cookies or same-origin capabilities).
-**Verify against the deployed server, not cached
+CSP-compatible (artifact iframes are opaque-origin — `/vendor/*` answers
+`Access-Control-Allow-Origin: *`; no cookies or same-origin capabilities).
+**Verify against the deployed server, not memory**: `docs {topic:"shelf"}`
+(CLI `vitrinka docs shelf`) names exactly this deploy's shelf. Pinned
+library versions have no door yet — import by the names below and trust the
+shelf topic.
 pin: internal/web/vendor_test.go#TestVendorRoute
-docs: `GET /api/v1/runtime`** returns `{cli, libs: {name: version}, cardKinds}`
-for exactly this deploy.
 
 ## Import map names (defined by every artifact scaffold)
 
@@ -28,7 +29,7 @@ for exactly this deploy.
 | `/vendor/katex.mjs` (+ `<link rel="stylesheet" href="/vendor/katex.css">`) | KaTeX with fonts inlined: `katex.render("c = \\sqrt{a^2+b^2}", el)`. |
 | `/vendor/apiref-1.mjs` | OpenAPI reference renderer: `ApiRefBody({spec})` React component + `parseSpec(spec)`; the same renderer the board's `api` card uses. |
 | `/vendor/xyflow-react.mjs` (+ its css) | React Flow 12 for node/edge canvases. |
-| `/vendor/uplot.mjs` | uPlot canvas engine (huge series; viz cards use it). |
+| `/vendor/uplot.mjs` | uPlot canvas engine (huge series; chart cards use it). |
 
 ## Fonts
 
@@ -44,12 +45,13 @@ remote or relative src is replaced.
 ## Choosing the right tool
 
 - **Chart on a BOARD** → `chart` card (`line/area/bars/pie/donut/scatter/heatmap/…`,
-  ~100-300 tokens, server-faced; `docs chart`). **Chart INSIDE an artifact** → Recharts.
+  ~100-300 tokens, server-faced; `docs {topic:"element:chart"}`). **Chart
+  INSIDE an artifact** → the kit's Chart first, Recharts only when it can't.
 - **UI mockup** → the `mockup` card, or a tw4 artifact with raw utilities;
   **UI with real controls** (forms, tabs, dialogs, tables) → hand-rolled on
   Tailwind utilities (kit-1/kit-2 are retired).
 - **API documentation** → the `api` CARD (whole OpenAPI JSON as
-  `payload.spec` — card-kinds.md); `apiref-1.mjs` directly only inside a
+  `payload.spec` — `card-kinds.md`); `apiref-1.mjs` directly only inside a
   larger artifact page.
 - tw4 (`body` + `runtime:"tw4"`) artifacts are static markup — no `<script>`
   runs. Anything needing the libraries above ships as a full `html` document

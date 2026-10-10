@@ -1,15 +1,16 @@
 # Stage: fix — from recording to shipped fixes
 
 For a plain annotation backlog with no recorded session, this stage does not
-apply — that is `/vitrinka:resolve`.
+apply — that is `vitrinka:resolve`.
 
 A human tested the app while the journey recorder captured everything: screens,
 clicks, the network, console errors, Web Vitals, and their ⌖ annotations. Your
 job is to turn that session into fixed code and a closed board. The failure
-modes this skill exists to prevent:
+modes this stage exists to prevent:
 
-1. **Traversing the raw session** — `/events` streams and board scrapes are
-   10–100× the tokens of the digest. ONE `get {kind:"session"}` call is the whole read.
+1. **Traversing the raw session** — raw event streams and board scrapes are
+   10–100× the tokens of the digest. ONE `get {kind: "session"}` call is the
+   whole read.
 2. **Fixing issue-by-issue in timeline order** — a session's 30 issues are
    usually 3–6 real workstreams. Five 500s from one endpoint are ONE fix.
 3. **One subagent per issue** — an agent that spends its whole session on one
@@ -17,17 +18,17 @@ modes this skill exists to prevent:
 4. **Fixing without closing** — every annotation ends with proof + status;
    every non-annotation issue ends verified or explained.
 5. **Parallel batches in ONE shared tree** — concurrent writers silently wipe
-   each other's changes (locale catalogs twice in one real run), break every
-   batch's gates ("the tree is moving under us"), and tempt shared-tree `git
-   stash`. Parallel batches get their own worktrees and meet again in a merge.
+   each other's changes, break every batch's gates ("the tree is moving
+   under us"), and tempt shared-tree `git stash`. Parallel batches get their
+   own worktrees and meet again in a merge.
 
-Input: a session board slug or URL (`/vitrinka:sessions acme-session-7 fix`,
-or the full `https://…/boards/acme-session-7` link) or a numeric session id.
-Run FROM THE APP'S REPO — the one the session tested.
+Input: a session board slug or URL (`/sessions acme-session-7 fix`, or the
+full board link) or a numeric session id. Run FROM THE APP'S REPO — the one
+the session tested.
 
 ## Phase 0 — one call for the whole session
 
-`get {kind:"session", board: "<slug>"}` (or `{ id: N }`). The digest returns:
+`get {kind: "session", board: "<slug>"}` (or `{id: N}`). The digest returns:
 
 - `steps` — the screen walk: route, title, action, notes, `cardId`, and
   `issueRefs` into the issues list. An entry with `count` > 1 is a folded run
@@ -47,7 +48,7 @@ Run FROM THE APP'S REPO — the one the session tested.
   egregious; otherwise note them in the summary, don't chase them).
 - `facets` — routes/hosts/issueKinds with counts: your grouping input.
 
-Do NOT follow up with `scrape_board`, `/events`, or per-annotation fetches
+Do NOT follow up with `scrape_board`, raw events, or per-annotation fetches
 here. The digest is the triage input, complete by design.
 
 ## Phase 1 — worktrees first (fork → isolate)
@@ -103,17 +104,16 @@ integration tree — edits hotspots directly like any other file: there is no
 concurrent writer to protect against and no Phase 3½ to apply intents for it.
 
 Enrichment happens ONCE, batched: if batches contain ambiguous annotations
-("this", "here"), spawn ONE subagent with all their crop/shot URLs
-(`shotUrl`, annotation `region`) to return TEXT findings — images never enter
-your context. Crop/shot URLs are relative and always need the Bearer
-token from `$VITRINKA_TOKEN` / `vitrinka auth token` via stdin
-(`printf 'Authorization: Bearer %s' "$TOKEN" | curl -H @- <url>`), never
-inline in argv.
+("this", "here"), spawn ONE subagent with their ids and step card ids to
+return TEXT findings — images never enter your context. The subagent reads
+pixels through the one door: `get_card_image {annotation: "<workspace>/<id>"}`
+for an annotation's crop, `get_card_image {board, cardId}` for a step's
+shot; no URL fetching, no token handling.
 
 ## Phase 3 — one subagent per batch
 
 Claim every annotation in the batch map BEFORE dispatching: `set_status {id,
-status:"working"}` — board pins flip amber and other listeners won't grab
+status: "working"}` — board pins flip amber and other listeners won't grab
 them. Claims belong to the ORCHESTRATOR alone; batch agents never touch
 annotation status. "annotation is not open — another session already claimed
 it" is not a skip signal — find the owning session and reconcile before any
@@ -194,10 +194,8 @@ Everything here runs on the INTEGRATED tree — boot infra/sim there, once.
   before claiming fixed.
 - Record the processed state (shape in `registry.md`, this directory) —
   the server IS the record; no repo file is written or committed:
-  `PATCH /api/v1/sessions/{id}` body
-  `{"pipeline":{"triaged":"<ISO now>","fixBranch":"<branch>","fixPr":"<url>"}}`
-  (always send the Bearer token from `$VITRINKA_TOKEN` / `vitrinka auth
-  token` via stdin, never argv). A stamp that did not land is a blocker,
+  `update {kind: "session", id, pipeline: {triaged: "<ISO now>", fixBranch:
+  "<branch>", fixPr: "<url>"}}`. A stamp that did not land is a blocker,
   not a note.
 - End with: batch map, per-issue outcomes, commits, anything punted to the
   user, and the board URL.
@@ -206,8 +204,8 @@ Everything here runs on the INTEGRATED tree — boot infra/sim there, once.
 
 | Instead of | Do |
 |---|---|
-| `/events` stream or `scrape_board` | `get {kind:"session"}` once |
-| `get {kind:"annotation"}` × N | digest issues already carry text+status; enrich only ambiguous ones, batched |
+| raw events or `scrape_board` | `get {kind: "session"}` once |
+| `get {kind: "annotation"}` × N | digest issues already carry text+status; enrich only ambiguous ones, batched |
 | Reading shots/crops in main context | ONE enrichment subagent returning text |
 | One agent per issue | one agent per 5–10-issue batch, ≤4 batches |
 | Fix → verify → reply per item | fix per batch, verify per batch, close per batch |
@@ -216,7 +214,7 @@ Everything here runs on the INTEGRATED tree — boot infra/sim there, once.
 
 ## Red flags — STOP
 
-- You are about to read `/api/v1/sessions/{id}/events` or scrape the board.
+- You are about to read the session's raw events or scrape the board.
 - Your context contains a screenshot.
 - You planned more than 4 subagents, or a subagent brief contains one issue.
 - You are editing the user's primary checkout instead of a worktree.

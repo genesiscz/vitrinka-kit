@@ -9,7 +9,7 @@ metadata:
 
 Claude maps the decisions as rich multiple-choice with recommendations and previews; the user steers scope, direction and architecture. Output: a short committed decision log plus a **feature brief** the next session or a subagent builds from directly.
 
-Procedure: `docs {topic: "guide:brainstorm-flow"}` (CLI `vitrinka docs guide:brainstorm-flow`). Board payload shapes: `references/board.md`; brief template and caps: `references/brief.md`.
+Procedure: `docs {topic: "guide:brainstorm-flow"}` (CLI `vitrinka docs guide:brainstorm-flow`). Board mechanics and payload shapes: `references/board.md`; brief template and caps: `references/brief.md`.
 
 <HARD-GATE>
 Do NOT write code, scaffold, or invoke implementation skills until the decision map's questions are answered (or the user explicitly says "just build it"). A truly trivial task still gets a 1-2 question map.
@@ -58,16 +58,16 @@ Attached to the epic with `upload_task_file {kind: "decision", filename: "<topic
 ## Feature brief — contracts
 
 - `compose_brief {id: <epic>}` (CLI `vitrinka task brief <id>`) is the ONE door to the skeleton; its deterministic sections come from the picks, its `<!-- skill -->` placeholders are filled under the hard caps in `references/brief.md`. Trim to the cap, never append past it. Real files and routes, not descriptions of them.
-- **The lineage name is the SERVER's** — upload with `versionOf: <ref.id>` and `filename: <ref.meta.filename>` from the compose reply (`<epic-slug>-brief.md`), never the topic or the dated spec filename; a different name forks a second lineage and pickup reads the stale skeleton.
+- **The lineage name is the SERVER's** — upload with `versionOf: <ref.id>` and `filename: <ref.meta.filename>` from the compose reply (`<epic-slug>-brief.md`; CLI `vitrinka task upload <epic> <file> --kind brief --version-of <ref.id>`), never the topic or the dated spec filename; a different name forks a second lineage and `vitrinka-pm:pickup` reads the stale skeleton.
 - A trivial map with no epic has no brief: the log's Architecture notes are its hand-off. A terminal-only brainstorm gets `404 no_brainstorm_board` from compose: write the whole brief from `references/brief.md` and upload it under the same name and `kind: "brief"`.
 
 ## Closing question — ALWAYS the last `AskUserQuestion`
 
-"In which style to implement?" with three exits — **Build here** (this session, the feature worktree, the whole remaining budget) · **Fresh session** (print `/continue <task url>` and stop) · **Subagent-driven** (forks on the brief's ordered `Work packages`, disjoint files, one package per fork, ≤ 4 per phase, a context-inheriting fork reviewer after each phase). A spike ends in its recommendation instead. Before the hand-back on a bound task, run the `handoff` skill (`hand_back`) — the chat block is its `rendered` output.
+"In which style to implement?" with three exits — **Build here** (this session, the feature worktree, the whole remaining budget) · **Fresh session** (after the hand-back, with `$VITRINKA_SESSION_LAUNCHER` set, run `sh -c '${VITRINKA_SESSION_LAUNCHER:?} "$@"' _ '<task url>' '<feature worktree abs path>'`: exit 0 → print its receipt line and stop; unset or non-zero → print `/continue <task url>` and stop) · **Subagent-driven** (forks on the brief's ordered `Work packages`, disjoint files, one package per fork, ≤ 4 per phase, a context-inheriting fork reviewer after each phase). A spike ends in its recommendation instead. Before the hand-back on a bound task, run the `handoff` skill (`hand_back`) — the chat block is its `rendered` output.
 
 ## Visual surface: vitrinka brainstorm boards
 
-An authenticated service: `vitrinka auth login` mints your token; `VITRINKA_TOKEN` or the OS keyring is always required (self-hosted deployments set `VITRINKA_URL`). No throwaway server: the board outlives the session.
+An authenticated service (`vitrinka auth login`; self-hosted deployments set `VITRINKA_URL`). No throwaway server: the board outlives the session.
 
 - **Board vs terminal**: the board is for 2-3 *different visual takes* — layouts, design directions, flows — or an explicit ask; plain preference questions stay in `AskUserQuestion`. Offer just-in-time, once; on decline stay text-only.
 - **Until the board actually exists** (created, composed, URL handed over), terminal mode is in force and the written-out map is mandatory. With a board, the FULL map lives on it — one CHAPTER section per decision — and the terminal map is shortened to its titles, never skipped.
@@ -75,5 +75,5 @@ An authenticated service: `vitrinka auth login` mints your token; `VITRINKA_TOKE
 - **A decision settled in the terminal closes its board question**: `update {kind:"question", id, answer, note}` — released and delivered, no Send; a 409 names a different board pick — ask which stands.
 - **A dropped direction is cancelled, never left Active**: `update {kind:"brainstorm", board, action:"plan"}` is the dry run (its tasks, their epic and its open children, each to its project's cancelled state; rows another live brainstorm links start unselected); apply `action:"cancel", rows` with the rows the user leaves selected; `reopen` undoes it. An epic-less brainstorm is closed with `finish`; one with an epic finishes when the epic is done.
 - **Every payload shape in `references/board.md` is exact** — read it before composing anything on a board.
-- **A board session listens**: once the URL is handed over, use the highest rung of `docs {topic: "guide:listening"}`. Without a background wake path, drain once and end on idle; name the host command for continuous delivery. Never loop empty MCP waits through the model.
+- **A board session listens**: once the URL is handed over, use the highest rung of `docs {topic: "guide:listening"}` (`vitrinka:listen`). Without a background wake path, drain once and end on idle; name the host command for continuous delivery. Never loop empty MCP waits through the model.
 - **Report the spend**: `usage: {tokens, effort}` on every `create {kind:"board"}`, `compose_board` and `update_cards`.

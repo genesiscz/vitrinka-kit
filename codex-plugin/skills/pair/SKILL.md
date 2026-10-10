@@ -1,23 +1,24 @@
 ---
 name: pair
-description: "Use when a human is user-testing the app live and wants bugs fixed as they appear — '/vitrinka:pair' from the app's repo, 'pair with me while I test', 'fix while I test'."
+description: "Use when a human is user-testing the app live and wants bugs fixed as they appear — '/vitrinka-qa:pair' from the app's repo, 'pair with me while I test', 'fix while I test'; a backlog of annotations is resolve."
 metadata:
   vitrinka-contract: "2026-09-15"
 ---
 
-# /vitrinka:pair — fix the app while the user tests it
+# /vitrinka-qa:pair — fix the app while the user tests it
 
 You are the **fixer half of a live pairing loop**. The user tests their app
 with the vitrinka recorder running and marks bugs as they go (⌖ snaps,
 notes); each snap is born as dispatched work and reaches you in seconds:
 fix it, get the fix into the RUNNING app, and tell them — before they finish
 testing the next screen. The recorder HUD shows them your presence ("● claude
-listening") and your narration ("⟳ fixing №3 …").
+listening") and your narration ("⟳ fixing №3 …"). A human types `/pair`;
+Codex `$pair`.
 
-Pair **composes with `listen`**: the watch arming, lease discipline, takeover
-handling, drain scoping, cancel/409 rules and the never-`resolved` law are
-all the listen skill's — read it first if this session hasn't. This skill
-adds the supervisor, the pair worktree, the restart step, and the pace.
+Pair **composes with `vitrinka:listen`**: the watch arming, lease discipline,
+takeover handling, drain scoping, cancel/409 rules and the never-`resolved`
+law are all the listen skill's — read it first if this session hasn't. This
+skill adds the supervisor, the pair worktree, the restart step, and the pace.
 
 ## Preflight — before the user starts testing
 
@@ -31,15 +32,12 @@ adds the supervisor, the pair worktree, the restart step, and the pace.
    from `origin/main`. ALL fixes land here as commits on this one rolling
    branch — one PR reviews the whole pairing run.
 3. **Supervise the app FROM the worktree**: `cd` there and run `vitrinka qa
-   pair run`. The supervisor resolves the worktree's own
-   `vitrinka.config.json`, so the running app serves the code your fixes
-   land in. Hand the user each stack's URL. Re-running is safe
-   (reuse-if-healthy). NEVER point a stack at an e2e `DATA_DIR`, and never
-   wipe one — the user's boards, prefs and logins live there and must
-   survive every restart.
-   - vitrinka itself: run the dev server with `-static internal/web/static`
-     so asset-only fixes (board engine, css, templates' static imports) are
-     browser-refresh-fast — restart only for Go changes.
+   pair run` (`status`, `logs`, `stop` are its siblings). The supervisor
+   resolves the worktree's own `vitrinka.config.json`, so the running app
+   serves the code your fixes land in. Hand the user each stack's URL.
+   Re-running is safe (reuse-if-healthy). NEVER point a stack at an e2e
+   `DATA_DIR`, and never wipe one — the user's boards, prefs and logins live
+   there and must survive every restart.
 4. **Arm the listener** (per the listen skill, project scope, from the
    worktree) on the highest rung this harness offers — the
    `docs {topic: "guide:listening"}` ladder: a native Monitor on
@@ -50,8 +48,8 @@ adds the supervisor, the pair worktree, the restart step, and the pace.
 Landing here mid-listen: a `№<id> [session] <project>: testing session
 started — …` watch line (the `sessions[]` lane of `wait_for_work`) is the
 user starting a recorder session — run this preflight now if you haven't;
-the № is a SESSION id (`get {kind:"session", id}` for context, NOT
-`get {kind:"annotation"}`) — then narrate you're in: `board_working` once the
+the № is a SESSION id (`get {kind: "session", id}` for context, NOT
+`get {kind: "annotation"}`) — then narrate you're in: `board_working` once the
 session's board exists, e.g. "◉ paired — watching your session".
 
 ## The pair loop — per drained item
@@ -59,12 +57,10 @@ session's board exists, e.g. "◉ paired — watching your session".
 Work items arrive exactly as in `listen` (`wait_for_work`, scoped, serial,
 oldest first). Per ⌖ snap (`[fix]`) or escalated note (`[note]`):
 
-1. `set_status {id, status:"working"}` + narrate: `board_working {board,
-   status:"⟳ fixing №<id> — <short cause>"}`. The narration is what the
+1. `set_status {id, status: "working"}` + narrate: `board_working {board,
+   status: "⟳ fixing №<id> — <short cause>"}`. The narration is what the
    tester sees IN THE APP; keep it under a dozen words. `board_working` is
-   a `rare`-module tool: the registration opts in on its `/mcp` URL with
-   `?modules=core,pm,qa,me,rare` (naming modules lists only those, so name
-   every one you keep).
+   a rare-tier door — callable by name whether or not it is listed.
 2. **Fix in the pair worktree.** Smallest correct change; commit on the
    rolling branch (conventional message referencing №id).
 3. **Get it into the running app**: hot stack — nothing to do; otherwise
@@ -72,13 +68,13 @@ oldest first). Per ⌖ snap (`[fix]`) or escalated note (`[note]`):
    survives; only the page reloads.
 4. `reply {id, text}` — one or two sentences: what was wrong, what changed,
    and "it's live — reload if the page didn't".
-5. `set_status {id, status:"in_review"}` — **the live app is the proof.** The
+5. `set_status {id, status: "in_review"}` — **the live app is the proof.** The
    tester verifies by looking at what they were already looking at, and
    accepts (or bounces, or snaps again) on the board. `attach_after` only
    when the fix is visual and a re-shot costs you nothing extra; never let
    screenshotting stall the loop.
 6. Clear or advance the narration: next item's "⟳ fixing …", or
-   `board_working {board, status:""}` when the queue is drained.
+   `board_working {board, status: ""}` when the queue is drained.
 
 ## Panel — what the tester sees
 
@@ -97,7 +93,7 @@ or tool calls); it broadcasts your raw prose to whoever watches the panel,
 so it is off unless explicitly started.
 
 Bugs too big for the loop (a schema change, a refactor): say so in the
-thread (`reply`), estimate honestly, `set_status {id, status:"open"}` to
+thread (`reply`), estimate honestly, `set_status {id, status: "open"}` to
 hand it back, and keep pace with the queue — pair optimizes for the tester's
 flow, not for finishing every item live.
 
@@ -106,15 +102,16 @@ flow, not for finishing every item live.
 The stop shows up as the session board settling (and the user usually says
 so). Then:
 
-1. Run the repo's tests for what you touched (the `vitrinka.config.json` `e2e` runner
-   for affected journeys when cheap, unit tests always).
-2. Open the PR for the pair branch (`/prc`) — the whole run reviews as one.
-3. Final board note: a `reply` on the last item (or a summary card via the
-   publish skill on bigger runs) linking the PR and listing №ids fixed /
-   handed back.
+1. Run the repo's tests for what you touched (the `vitrinka.config.json`
+   `e2e` runner for affected journeys when cheap, unit tests always).
+2. Open the PR for the pair branch per the repo's conventions — the whole
+   run reviews as one.
+3. Final board note: a `reply` on the last item (or a summary card via
+   `vitrinka:publish` on bigger runs) linking the PR and listing №ids fixed
+   / handed back.
 4. **Leave the app running** exactly as supervised. Report each stack's URL,
    the board link, and the PR link.
-5. Before the hand-back on a bound task, run the `handoff` skill
+5. Before the hand-back on a bound task, run `vitrinka-pm:handoff`
    (`hand_back`) — the chat block is its `rendered` output.
 
 Never `resolved`, never unscoped drains, never a second listener on the same

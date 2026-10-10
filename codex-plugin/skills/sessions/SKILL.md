@@ -1,16 +1,17 @@
 ---
 name: sessions
-description: "Use for a recorded user-testing session or its backlog — 'process the session', 'pending sessions', 'generate journey tests from the session' — and for 'vitrinka qa session archive|continue'."
+description: "Use for a recorded user-testing session or its backlog — 'process the session', 'pending sessions', 'generate journey tests from the session' — and for 'vitrinka qa session archive|continue'; exploratory testing by you is usertest."
 metadata:
   vitrinka-contract: "2026-09-15"
 ---
 
-# /vitrinka:sessions — the pipeline autopilot
+# /vitrinka-qa:sessions — the pipeline autopilot
 
 The recorder keeps producing sessions; this skill keeps consuming them. It
 is an ORCHESTRATOR over two stage engines, `references/fix.md` (session →
 shipped fixes) and `references/generate-test.md` (session → journey tests +
-registry), closing with a verified e2e run traced back to the board.
+registry), closing with a verified e2e run traced back to the board. A
+human types `/sessions`; Codex `$sessions`.
 
 Procedure: `docs {topic: "guide:sessions-pipeline"}` (CLI `vitrinka docs
 guide:sessions-pipeline`) — Phases 0–4 and the archive/continue sequence.
@@ -19,6 +20,21 @@ Arguments: optional — a session board slug/URL or id for just that one;
 without it, every pending session, oldest first. A trailing `fix` or `test`
 runs ONLY that stage (its reference end to end, its own worktree and stamp
 rules). Run FROM THE APP'S REPO.
+
+## Doors
+
+- **Discover**: `search {q: "<project>", groups: ["sessions"], project,
+  limit: 50}` lists the project's sessions newest first — title, status
+  and board slug per row (`tags: "ai"` isolates agent recordings). No door
+  lists a project's sessions with their stamps in one call: read each
+  candidate's stamps with the digest.
+- **Digest**: `get {kind: "session", id | board}` — `session.status`,
+  `session.environment`, `session.meta.pipeline`, `session.boardUrl`, then
+  steps, issues, vitals, facets. ONE call feeds both stages.
+- **Stamp**: `update {kind: "session", id, pipeline: {…}}` — keys merge
+  into `meta.pipeline`, null deletes (shape: `references/registry.md`).
+- **Verification pass**: `compose_board {board, journey: <pass-chain key>,
+  pass: "next"}` on the SESSION board.
 
 ## Laws
 
@@ -33,26 +49,30 @@ rules). Run FROM THE APP'S REPO.
   consulted over the server, never committed.
 - **Pending** = status `done`, projected (`boardSlug` set), no `tested`
   stamp; `triaged` without `tested` resumes at the test stage.
+- **The `tested` stamp names the journey keys it covered** (`journeys:
+  [<key>…]`): the server records the session as an `observed` run on each
+  matching journey's plan — seen, never a pass. Name them; never publish
+  the session as a runner result.
 - **Machine-driven runs are excluded**: `environment` `sim` or tag `ai` is
   an agent's own dev-loop recording — never pipelined unless the user names
   it as the argument.
 - **One session at a time, oldest first, in its own worktree.** Concurrent
   fix batches get their own worktrees off one base; the session's worktree
   is the INTEGRATION tree — never four agents in one tree.
-- **Digest once**: ONE `get {kind:"session", id}` feeds both stages. Test generation
-  requires the full journey — an issues view is not coverage evidence.
+- **Digest once**: ONE `get {kind: "session", id}` feeds both stages. Test
+  generation requires the full journey — an issues view is not coverage
+  evidence.
 - **Ship only after the verification run**: fixes and tests stay committed
   locally on the session's branch until the targeted journeys ran green (or
   explained) against a stack that passed its readiness check. One branch
   per session; backfill the `testPr` stamp once the PR exists.
 - **The verification pass lands on the SESSION board** as the next pass of
-  its existing pass-chain (`compose_board {board, journey: <pass-chain
-  key>, pass: "next"}`, one `step` card per journey) — never on a different
-  board.
+  its existing pass-chain (one `step` card per journey) — never on a
+  different board.
 - **Failures are work, not noise**: a failing NEW test loops back to its
   emitter (fix it or mark `expectedFail` with the linked issue — never
   delete); a failing EXISTING test after your fixes is your regression.
-- Before the hand-back on a bound task, run the `handoff` skill
+- Before the hand-back on a bound task, run `vitrinka-pm:handoff`
   (`hand_back`) — the chat block is its `rendered` output.
 
 ## Coding-agent sessions — archive and continue
@@ -71,13 +91,13 @@ vitrinka qa session continue <task-id> [--ref <distill-ref>]
   Same filename on the same task = a new VERSION, never a replacement.
 - **The gate is hard**: a credential (JWT, provider API key, bearer header,
   checksum-verified IBAN, a credential-shaped value under a sensitive JSON
-  key) REFUSES the upload — exit 3, no flag past it; rotate the secret and
-  archive again. E-mails, phone numbers and long opaque runs are masked in
-  place as `▮▮▮ [redacted-<type>]`.
+  key) REFUSES the upload — no flag past it; rotate the secret and archive
+  again. E-mails, phone numbers and long opaque runs are masked in place as
+  `▮▮▮ [redacted-<type>]`.
 - **Paths are portable**: an absolute path under a git checkout becomes
-  `//vitrinka:repo:git@github.com:Org/Repo.git/<rel>`, one under `$HOME`
-  becomes `//vitrinka:home/<rel>`; the reading CLI maps them back to ITS
-  checkouts, and an unresolved placeholder stays as-is.
+  `//vitrinka:repo:<remote>/<rel>`, one under `$HOME` becomes
+  `//vitrinka:home/<rel>`; the reading CLI maps them back to ITS checkouts,
+  and an unresolved placeholder stays as-is.
 - **Archiving is a hand-off act, never a hook**: `vitrinka task handback
   --transcript` or `vitrinka qa session archive`; attach a `hint`.
 - **Continue prints an OFFER, never runs it**: the native resume is printed

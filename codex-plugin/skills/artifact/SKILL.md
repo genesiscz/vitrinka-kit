@@ -38,74 +38,80 @@ Routing when ambiguous:
   (it composes the diagram + page references and owns the end-to-end flow).
 - UI work in progress, flows, "screenshot as I go" → **publish**, not here.
 
-Sharing with outside people: `share_board` with `cardId` (the id in the
+Sharing with outside people: `share_board {board, cardId}` (the id in the
 element's `/a/<id>` URL) or `vitrinka board share <board> --card <id>` mints
 a link that OPENS on that element on the public share origin; the human twin
 is the ⇗ share action in the solo view's head. The link still grants the
 whole board the element sits on, so an artifact meant for outside eyes lives
-on a board with nothing private beside it. Hand the URL over bare on its own
-line.
+on a board with nothing private beside it. Hand the URL over as a masked
+link, `[<artifact title>](<url>)`, the URL exactly as minted.
 
 ## Shared core (all surfaces)
 
-- **Doors.** MCP for board discovery, composition, edits and arrange; the
-  `vitrinka` CLI for set imports and artifact pushes; direct HTTP only for an
-  operation neither exposes. One workspace/project/board per task — check it
-  on every receipt. A receipt or `render.png` proves placement, not readable
+- **Doors, in this order.** The vitrinka MCP tools for discovery,
+  composition, edits, arrange, `import` and `refresh`; the `vitrinka` CLI
+  for set imports and artifact pushes (`board push`, `board artifact`,
+  `board diagram`); an operation neither exposes has no door — say so and
+  stop, never raw HTTP. One workspace/project/board per task — check it on
+  every receipt. A receipt or `render.png` proves placement, not readable
   fit: read the board back and name what you did not check. A renderer
   failure keeps its semantic source and is reported as a defect, never
-  replaced by a raster/base64 figure or a hand-grown rectangle.
+  replaced by a raster/base64 figure or a hand-grown rectangle. `undo
+  {board}` reverts your last batch.
 - **Edit existing elements by reference.** `read_element {id}` returns a
   paginated outline with content revision and payload-relative JSON Pointer
-  paths; retrieve only the needed values with `{id,paths:[...]}` — previews
+  paths; retrieve only the needed values with `{id, paths:[...]}` — previews
   are not full source. For an AI-layer canonical element, `edit_element
-  {id,revision,edits:[{op:"replace",path:"/elements/2/payload/md",value:"…"}]}`
-  retains all other content and runs the normal validator/layout. `add`
-  inserts an array item (`-` appends), `remove` omits value. Edits are
-  ordered; indexes are safe only for the revision read. A 409 means re-read
-  affected content and reconcile, never blindly retry. The receipt carries
-  the next revision. Outline pagination must stay on one revision or restart.
-- Vitrinka is **an authenticated service** (default base
-  `https://app.vitrinka.ai`; self-hosted deployments set `VITRINKA_URL`).
-  `vitrinka auth login` mints your token; `VITRINKA_TOKEN` or the OS keyring
-  is always required — never echo it; feed Bearer headers via stdin
-  (`printf 'Authorization: Bearer %s' "$TOKEN" | curl -H @- …`), never argv.
+  {id, revision, edits:[{op:"replace", path:"/elements/2/payload/md",
+  value:"…"}]}` retains all other content and runs the normal
+  validator/layout. `add` inserts an array item (`-` appends), `remove`
+  omits value. Edits are ordered; indexes are safe only for the revision
+  read. A 409 means re-read affected content and reconcile, never blindly
+  retry. The receipt carries the next revision. Outline pagination must stay
+  on one revision or restart.
+- Vitrinka is **an authenticated service**: `vitrinka auth login` mints the
+  token (`VITRINKA_TOKEN` or the OS keyring; self-hosted deployments set
+  `VITRINKA_URL`) — never print it.
 - **The deploy documents itself.** Element payload contracts, component
   props, doc.json block shapes, chart forms and the runtime shelf are served
   by the deployment's own docs tree — the `docs` MCP tool (`artifact_docs`
   is its alias) or `vitrinka docs <topic>` (no topic → the index; `docs
   {family:"element"}` narrows to one layer; families element / board /
-  artifact, `family:topic` disambiguates collisions) — generated from the
-  validator and kit the deploy actually runs. Look up, don't recall; the
-  references here carry workflow and laws, never prop tables.
+  artifact / guide / kind, `family:topic` disambiguates collisions) —
+  generated from the validator and kit the deploy actually runs. Look up,
+  don't recall; the references here carry workflow and laws, never prop
+  tables.
 - **Report the spend behind every composition**: pass `usage: {tokens,
-  effort}` on `create {kind:"board"}`, `compose_board` and `update_cards` — your
-  rough estimate of what the call cost you (thinking + reading the source
-  material; `effort` low | medium | high). Not verified or billed; it lands
-  in the workspace's agent calls ledger, readable as SQL via the `query`
-  tool / `vitrinka search query`.
+  effort}` on `create {kind:"board"}`, `compose_board` and `update_cards` —
+  your rough estimate of what the call cost you (thinking + reading the
+  source material; `effort` low | medium | high). Not verified or billed; it
+  lands in the workspace's agent calls ledger, readable as SQL via the
+  `query` tool / `vitrinka search query`.
 - **A board that belongs to a task** (a task, epic or subtask is in context):
   stamp it once with `add_task_ref {id, kind:"board", ref:"<slug>"}` (no
   `cardId`) so the board's breadcrumb — and every `/a/<id>` element on it —
-  reads `PRO-12 · title ↗` back to the task; `GET /boards/{slug}/tasks` lists
-  what a board belongs to.
+  reads `PRO-12 · title ↗` back to the task. The task's `refs` list the
+  stamp; reading a board's tasks from the board side has no door yet.
 - **Hand back only server-returned URLs**: a board's `url` field carries
   `/w/<workspace>` — never hand-compose `{base}/boards/<slug>`; a standalone
   artifact hands back the URL `vitrinka board push` prints — the element's
   solo view (`/a/<id>`, for doc.json and `index.html` alike; there is no set
-  page). The link goes in your final summary, always.
+  page). The link goes in your final summary, always, as a masked Markdown
+  link labelled by the board's or artifact's title over that exact URL.
 - **Delegation**: compose-heavy authoring (standalone doc.json/components,
-  docs-board narrative) can run in the `vitrinka-publisher` agent, dispatched
-  in the background — brief it with this skill's base directory and the
-  surface's reference path; it returns the live URL. Capture never delegates;
-  on runtimes without the agent (Codex), work inline from the same references.
+  docs-board narrative) can run in the `vitrinka:vitrinka-publisher` agent,
+  dispatched in the background — brief it with this skill's base directory
+  and the surface's reference path; it returns the live URL. Capture never
+  delegates; on runtimes without the Agent tool (Codex), work inline from
+  the same references.
 - **Apply publisher write-backs**: when the publisher returns `writebacks`,
   validate every `ref` as a safe repo-relative path in the active worktree,
   replace it with the complete supplied `md`, commit and push it with the
-  current work, then refresh the matching repo-backed card from pushed
-  content. Any item that cannot be applied safely is reported, and the
-  artifact is not claimed complete. `writebacks: none` needs no repo action.
+  current work, then `refresh {card, source, rev}` the matching repo-backed
+  card from the pushed content. Any item that cannot be applied safely is
+  reported, and the artifact is not claimed complete. `writebacks: none`
+  needs no repo action.
 - Boards are live: after creating a board (docs board included), arm the
-  listener yourself per the listen skill — a subagent can never arm the
+  listener yourself per `vitrinka:listen` — a subagent can never arm the
   parent's monitor. A standalone artifact is a page, not a board — nothing to
   listen to.

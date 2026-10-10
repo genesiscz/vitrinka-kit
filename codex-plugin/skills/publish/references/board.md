@@ -1,8 +1,9 @@
 # Intent: board — boards born organized (+ testing-journey suites)
 
 **Delegation:** this intent's creation + composition work runs in the
-`vitrinka-publisher` agent — see the Delegation section in `../SKILL.md`.
-Brief it with this file's path so it follows these contracts itself.
+`vitrinka:vitrinka-publisher` agent — see the Delegation section in
+`../SKILL.md`. Brief it with this file's path so it follows these contracts
+itself.
 
 A board created bare (`create {kind:"board", slug}` and nothing else) is homeless:
 no project group in the sidebar, no type, no meta. Metadata is a first-class
@@ -56,21 +57,15 @@ part of creation.
    skeleton (QA session, decision map, dashboard, deck, journey suite …) in
    one `compose_board` call per coherent unit — intent not coordinates; a
    single card is a batch of one, anchored by relation. Save a recurring
-   structure of your own with `save_template` and instantiate via
-   `compose_board {template, params}` (`save_template` and `request_review`
-   are `rare`-module tools: opt in on the registration's `/mcp` URL with
-   `?modules=core,pm,qa,me,rare` — naming modules lists only those, so name
-   every one you keep).
+   structure of your own with `save_template` (a `rare` door — callable by
+   name) and instantiate via `compose_board {template, params}`. `undo
+   {board}` reverts your last batch.
 4. **Hand over the server's `url` field** from the create/list response — it
    carries the `/w/<workspace>` segment; never compose a path yourself.
 5. **Arm the listener AUTOMATICALLY** — if this session will service the
-   board's annotations (it almost always will), follow the listen skill
-   (`/vitrinka:listen`; the plugin's `skills/listen/SKILL.md`) right after
-   creating, on the highest rung the `docs {topic: "guide:listening"}` ladder
-   offers in this harness: a native Monitor on `exec vitrinka work watch` (the
-   `exec` is load-bearing — without it the watch outlives the session and
-   holds the board's lease forever), the `vitrinka work listen --harness
-   <name>` host, or a one-shot drain that ends on idle. Announce the rung's
+   board's annotations (it almost always will), follow `vitrinka:listen`
+   right after creating, on the highest rung the `docs {topic:
+   "guide:listening"}` ladder offers in this harness. Announce the rung's
    one line. Never offer or wait to be asked.
 
 ## Testing-journey suites (`board_type: "journeys"`)
@@ -108,7 +103,8 @@ compose-ready skeleton: `get_templates` → **template 10**. The shape:
   `docs {topic: "board:lanes"}`.
 - **Iterating a journey** after code changes = the suite section's NEXT PASS
   (`compose_board {journey, pass:"next"}`, template 2) — the old pass stays
-  for comparison and `request_review {journey}` reviews the delta.
+  for comparison; `review_judge {board, journey}` (a `rare` door) reviews
+  the delta and `review_judgments {board}` reads its verdicts.
 
 ### Token economy
 

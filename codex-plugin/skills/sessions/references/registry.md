@@ -17,21 +17,22 @@ this set + a repo test scan.
 Read doors:
 
 - `vitrinka task resolve-qa --json` (the branch's `vt-<id>`, or `--task
-  <epic|qa>`) → `get {kind:"task", id: <qa>, include: [children]}` — the feature's
-  QA plan with its `journey` children. Exit 4 = no plan for this branch.
-- `list {kind:"task", project, f: {types: ["journey"]}, fields: "full"}` — every
-  journey of the project when no plan is bound; `search {kind:"task", q}` for one
-  by intent.
+  <epic|qa>`) → `get {kind: "task", id: "<workspace>/<qa>", include:
+  ["children"]}` — the feature's QA plan with its `journey` children. No
+  plan for this branch → the project-wide read below.
+- `list {kind: "task", project, f: {types: ["journey"]}, fields: "full"}` —
+  every journey of the project when no plan is bound; `search {kind:
+  "task", q, project}` for one by intent.
 
 Per journey task:
 
 - `fields.key` — the registry key: kebab-case user intent. NEVER
   session-derived (`session-7-flow` is forbidden — journeys outlive sessions).
 - `fields.test` — the primary spec path (`e2e/orders-create.spec.ts`);
-  written by generate-test through `update {kind:"task"}`.
-- `fields.route` / `flow` / `expected` / `role` — the walk itself (see the
-  tasks skill's "Journeys" recipe).
-- refs — `add_task_ref {kind: "session", ref: "<session board slug>"}`
+  written by generate-test through `update {kind: "task", id, fields}`.
+- `fields.route` / `flow` / `expected` / `role` — the walk itself (the
+  `vitrinka-pm:tasks` skill's "Journeys" recipe).
+- refs — `add_task_ref {id, kind: "session", ref: "<session board slug>"}`
   accumulates every recording that shaped the journey; the dedup signal for
   `skip` verdicts. Board refs carry `meta.section`.
 - `fields.verdict` — `untested` (emitted, not yet run) | `pass` (ran green)
@@ -52,24 +53,25 @@ recipe adds it under the qa task.
 ## The session ledger — `meta.pipeline` on the recorded session
 
 Which recorded sessions this repo has already worked, and what came out of
-them. `get {kind:"session", board}` (or `GET /api/v1/sessions?project=<slug>`) returns
-each session with its stamps:
+them. `search {q: "<project>", groups: ["sessions"], project, limit: 50}`
+lists candidates (status + board slug per row); `get {kind: "session", id |
+board}` returns one session with its stamps under `session.meta.pipeline`.
+Stamps are written through ONE door:
 
-```
-PATCH /api/v1/sessions/{id}
-{"pipeline": {"triaged": "<ISO>", "fixBranch": "fix/session-7", "fixPr": "<url>"}}          # fix stage
-{"pipeline": {"tested": "<ISO>", "testBranch": "test/session-7", "journeys": [...], "testPr": "<url>"}}  # generate-test
+```text
+update {kind: "session", id, pipeline: {triaged: "<ISO>", fixBranch: "fix/session-7", fixPr: "<url>"}}                       # fix stage
+update {kind: "session", id, pipeline: {tested: "<ISO>", testBranch: "test/session-7", journeys: [...], testPr: "<url>"}}   # generate-test
 ```
 
-Always send the Bearer token from `$VITRINKA_TOKEN` / `vitrinka auth token`
-via stdin, never argv. Stamps merge key-wise (null deletes); they never touch
-session activity or auto-close timing.
+Stamps merge key-wise (null deletes); they never touch session activity or
+auto-close timing.
 
 - `triaged`/`fixBranch`/`fixPr` — written by the fix stage at close-out.
 - `tested`/`testBranch`/`journeys` — written by generate-test at close-out.
   `testBranch` is the durable pointer (a commit cannot embed its own hash);
-  `testPr` is added once the PR exists.
+  `testPr` is added once the PR exists. `journeys` names the keys the
+  server records as `observed` runs on each matching plan.
 - A session with `tested` is DONE for the pipeline; the retrieval autopilot
-  (phase 3) skips it. Absent or fix-only entries are pending work.
+  skips it. Absent or fix-only entries are pending work.
 - A stamp missing after a stage ran is a bug to fix now — the server IS the
   record; there is no repo file to fall back on.

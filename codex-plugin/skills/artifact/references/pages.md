@@ -20,6 +20,9 @@ compose: {"cards":[{"kind":"page","payload":{"md":"# Architecture\n\nThe **eve**
   Composing a new `md` marks the editor mirror stale (`pmStale`): a human
   opening the card re-parses your markdown, then their block edits round-trip
   back to markdown you read again.
+- **Read** a page's current markdown with `scrape_board {board, pages:
+  "full"}` (`preview`, the default, is title + excerpt) or `read_element
+  {id, paths:["/md"]}`.
 - **Remove** a stale page with `update_cards {remove:[id]}`: pages you created
   go straight to the trash; anyone else's answer `409 needs_confirm` with a
   `preview` — read it, repeat the same ids with `confirm:<token>` and a
@@ -99,18 +102,18 @@ compose: {"cards":[{"kind":"page","payload":{"md":"# Architecture\n\nThe **eve**
   shows a quiet file chip, the md is just the link.
 - **Code** — fenced blocks with a language tag round-trip as-is.
 - **Mentions** — `@[handle]` renders a mention token and (on save) files a
-  wire notification for that member. An unknown handle still renders. Members
-  come from `GET /api/v1/boards/{slug}/members`.
+  wire notification for that member. An unknown handle still renders; the
+  board's member list has no agent door — use handles the operator gave you.
 
 ## Page comments are ordinary annotations
 
 A page comment is a normal board annotation anchored to a TEXT RANGE: its
 `selector.quote` (plus a little prefix/suffix) says WHERE in the page it
-points. You see them via `list {kind:"work"}` / `scrape_board` and reply/resolve them
-like any annotation. Comment highlights are NOT written into `md`; if you
-re-compose `md` and keep the quoted sentence, the highlight re-anchors
-automatically, and if you remove the sentence the comment stays wire-only
-(never an error).
+points. You see them via `list {kind:"work"}` / `scrape_board` and
+reply/resolve them like any annotation. Comment highlights are NOT written
+into `md`; if you re-compose `md` and keep the quoted sentence, the highlight
+re-anchors automatically, and if you remove the sentence the comment stays
+wire-only (never an error).
 
 ## Repo-file-backed pages (the living contract)
 
@@ -121,18 +124,16 @@ diagrams use.
   rev:"<git SHA>"}` — `ref` the repo-relative path, `rev` the SHA the current
   `md` was read at (`git rev-parse --short HEAD`).
 - **Refresh after a repo edit** (repo → board): read the new file, then
-  `POST /api/v1/cards/{id}/refresh {source:<new md>, rev:<new SHA>}` — the
-  server replaces `payload.md` and bumps `source.rev`. (`Authorization:
-  Bearer` via stdin — never inline the token: `printf 'Authorization: Bearer
-  %s' "$TOKEN" | curl -H @- …`.)
+  `refresh {card: <id>, source: <new md>, rev: <new SHA>}` — the server
+  replaces `payload.md` and bumps `source.rev` (a page always needs
+  `source`; only an imported diagram re-parses from its stored blob).
   pin: internal/web/docs_boards_test.go#TestPageRefresh_ReplacesMarkdown
 - **Write-back** (board → repo) is THIS skill's job — the server has no repo
   access. When a human edited the board page and the repo file must match:
-  1. Read the current page markdown — `scrape_board {board}` (page cards
-     return their `md`) or the card API.
+  1. Read the current page markdown — `scrape_board {board, pages:"full"}`.
   2. Write it to the repo file (`docs/x.md`).
   3. Commit with a conventional message; capture the new SHA.
-  4. Refresh the card with `{source:<that md>, rev:<new SHA>}` so `source.rev`
+  4. `refresh {card, source:<that md>, rev:<new SHA>}` so `source.rev`
      matches the commit.
 
 ## Deep links (page ↔ diagram)

@@ -7,17 +7,15 @@ metadata:
 
 # publish — one skill, four intents
 
-Everything *captured* lands here; everything *authored* (standalone documents,
-pages, diagrams, docs boards) is the **artifact** skill. Pick the intent
-first, then follow the procedure.
-
-Procedure — capture steps per intent: `docs {topic: "guide:publish-capture"}`
-(CLI `vitrinka docs guide:publish-capture`).
+Everything *captured* lands here; everything *authored* (standalone
+documents, pages, diagrams, docs boards) is the **artifact** skill. Pick the
+intent, then follow the procedure the server serves: `docs {topic:
+"guide:publish-capture"}` (CLI `vitrinka docs guide:publish-capture`).
 
 | Intent | Deliverable | When |
 |---|---|---|
 | **session** | testing board that fills live | sticky capture while building — "screenshot this as I go" |
-| **journey** | signpost flow map — screens wired by *what was clicked* | visualize a user journey: multi-step, branching, full-page |
+| **journey** | signpost flow map — screens wired by *what was clicked* | a user journey: multi-step, branching, full-page |
 | **walkthrough** | client-facing annotated walkthrough | outsiders will read (and annotate) the journey |
 | **board** | a deliberately organized board / testing-journey suite | board management, not capture → `references/board.md` |
 
@@ -27,37 +25,36 @@ branching shows up — same set, same board slug.
 
 ## Delegation — capture is yours, publishing is the agent's
 
-**Capture stays in this session; composition runs in the plugin's
-`vitrinka-publisher` agent** (you just wrote the code — `--src`, `--state`
-and `--action` depend on that knowledge). Everything compose-shaped
-delegates: the structure pass, steps sections, summary card, walkthrough
-narrative, board suites. Dispatch via the Agent tool, `subagent_type:
-"vitrinka-publisher"`, in the **background** — keep working; the completion
-notification carries the result.
+Capture stays in this session (`--src`, `--state` and `--action` depend on
+the code you just wrote); composition runs in the plugin's publisher agent:
+Agent tool, `subagent_type: "vitrinka:vitrinka-publisher"`, in the
+**background** — keep working; the completion notification carries the
+result. Everything compose-shaped delegates: the structure pass, steps
+sections, summary card, walkthrough narrative, board suites.
 
-- **Stays inline**: the one-command initial import (`vitrinka board create` /
-  `board create --journey`) — a single idempotent CLI call; run it yourself so the
-  user gets the URL the moment the board exists. Incremental re-runs too.
-  A screenshots push already lands on the `<project>-<branch>-<key>` journey
-  board and prints that board's URL; the import is for a custom slug/title.
+- **Stays inline**: the one-command initial import (`vitrinka board create`,
+  `--journey` for a tree) — idempotent; run it yourself so the user gets the
+  URL the moment the board exists. A capture push already lands on the
+  `<project>-<branch>-<key>` board and prints its URL; the import is for a
+  custom `--slug`/`--title`. Incremental re-runs too.
 - **Brief the agent fully** — it starts with zero context: the intent, this
-  skill's base directory (so it Reads the intent's section +
-  `references/card-kinds.md` itself), repo root + set root, what was captured
-  (labels, declared branches, narrative), board slug/project/subgroup + meta,
-  the summary verdict you want, the resolved `qa.id` + its `journey`
-  children, and — on update passes — what changed.
-- **When the notification lands**: relay the server-returned URL to the user
-  and inspect `writebacks`. For each write-back, validate that `ref` is a safe
+  skill's base directory (it reads the intent's section and
+  `references/card-kinds.md` itself), repo root + set root, what was
+  captured (labels, declared branches, narrative), board slug/project/
+  subgroup + meta, the summary verdict you want, the resolved `qa.id` + its
+  `journey` children, and — on update passes — what changed.
+- **When the notification lands**: relay the server-returned URL and inspect
+  `writebacks`. For each write-back, validate that `ref` is a safe
   repo-relative path in the active worktree, replace it with the supplied
-  complete `md`, commit and push it with the current work, then refresh that
-  repo-backed card from the pushed content. An unsafe or inapplicable
-  write-back is reported, and the publish is not claimed complete. Once
-  write-backs are settled, arm the listener YOURSELF (the listen skill) — a
-  subagent can never arm the parent's monitor. Never fabricate or predict the
-  URL while waiting.
-- **Fallback ladder** (say which rung you're on): `vitrinka-publisher` agent →
-  (agent type unavailable — Codex ships skills only) inline, same contracts,
-  straight from this file.
+  complete `md`, commit and push it with the current work, then `refresh
+  {card, source, rev}` that repo-backed card from the pushed content. An
+  unsafe or inapplicable write-back is reported, and the publish is not
+  claimed complete. Then arm the listener YOURSELF (`vitrinka:listen`) — a
+  subagent can never arm the parent's monitor. Never fabricate or predict
+  the URL while waiting.
+- **Fallback ladder** (say which rung you're on): the publisher agent → (no
+  Agent tool — Codex ships skills only) inline, same contracts, from this
+  file.
 
 ## Capture laws (every intent)
 
@@ -73,26 +70,27 @@ notification carries the result.
   components as repo-relative paths; an annotation on the shot then
   dispatches with exact file targets. `--state` records what a reproducer
   needs.
-- **Web captures are 2× device scale** unless the repo sets
-  `capture.hidpi` off (`vitrinka config hidpi`); `board capture web
-  --viewport WxH` refuses a 1× file and names the recapture. Native
-  sim/device captures are already native-res — never downscale them.
+- **Web captures are 2× device scale** unless the repo sets `capture.hidpi`
+  off (`vitrinka config hidpi off`); `board capture web --viewport WxH`
+  refuses a 1× file and names the recapture. Native sim/device captures are
+  already native-res — never downscale them.
 - `--open <deeplink>` does navigate + wait + capture — never chain shell
-  sleeps. Snap pushes detached — never wait or poll.
+  sleeps. A capture pushes detached — never wait or poll.
 - **Read the saved image to verify** — right screen, right state.
   Non-delegable.
 - **Full-page**: the viewport shot is the PRIMARY card (wires anchor in the
   chrome); a content-only companion shot only when the main content
   genuinely overflows; never scroll-and-stitch.
-- Never commit shots. Write auth: `VITRINKA_TOKEN` env or `vitrinka auth
-  token` — never echo it. Never run `vitrinka update` unprompted or repeat
-  the offer.
+- Never commit shots. Auth is `vitrinka auth login`'s token (`VITRINKA_TOKEN`
+  or the OS keyring); never print it. Never run `vitrinka update` unprompted
+  or repeat the offer.
 
 ## Board laws (session + journey wrap-up)
 
 Per-kind payload contracts: the `docs` MCP tool; kind index + doctrine:
 `references/card-kinds.md`. One `compose_board` call per coherent unit,
-`get_templates` first, never invent card shapes.
+`get_templates` first, never invent card shapes; `undo {board}` reverts your
+last batch.
 
 - **Steps ARE the walkthrough**: ONE `section` per journey/area, a numbered
   `step` per screen with `status` and `image: {project, branch, selector,
@@ -104,16 +102,17 @@ Per-kind payload contracts: the `docs` MCP tool; kind index + doctrine:
   pixel-space crops and face versioning only exist on shot/media cards.
   pin: e2e/board-v5.spec.ts#lightbox from the deck: full image, version filmstrip after swap, ⌖ target
 - **"Review these screens and annotate what's off"** is the `annotate` tool
-  (native staged annotations with regions — survey with `get_card_image
-  {cardIds}`, measure on a single-card read), never a `finding`/document card and never `highlight`; docs topic
-  `annotation`.
+  (staged annotations with regions — survey with `get_card_image
+  {cardIds}`, measure on a single-card read), never a `finding`/document
+  card and never `highlight`; docs topic `annotation`.
 - **Every board ends with ONE summary `callout`** — verdict, counts, links,
   what was NOT covered; later passes UPDATE it, never stack a second.
   Statuses live on the cards (`step.status`).
 - **Iteration = next pass** (`pass: "next"`), never mixed takes.
-- **Report the spend**: `usage: {tokens, effort}` on every `create {kind:"board"}`,
-  `compose_board` and `update_cards` — not verified or billed.
-- **The listener is yours**: after the wrap-up, arm it per the listen skill,
+- **Report the spend**: `usage: {tokens, effort}` on every `create
+  {kind:"board"}`, `compose_board` and `update_cards` — not verified or
+  billed.
+- **The listener is yours**: after the wrap-up, arm it per `vitrinka:listen`,
   announce `⏳ listening — annotate away`, END the turn.
 
 ## Journey laws
@@ -136,7 +135,8 @@ Per-kind payload contracts: the `docs` MCP tool; kind index + doctrine:
   voice; ONE intro `text` card, a `callout` per caveat.
 - A share link (`share_board` / `vitrinka board share`) shares the WHOLE
   board — never mint on one that carries drafts the client must not see.
-  Hand the share URL bare on its own line.
+  Hand the share URL over as a masked link, `[<board title>](<url>)`, the
+  URL exactly as minted.
 - Sandbox/demo org for any shot listing tenant data; mint-then-revoke any
   credential that appears on screen.
 
@@ -144,25 +144,26 @@ Per-kind payload contracts: the `docs` MCP tool; kind index + doctrine:
 
 - **Test results never come through this skill.** Runner output goes through
   `vitrinka qa run -- <test command>`; an exploratory session through
-  `vitrinka qa usertest start · case · snap · verdict · finish`. This skill
-  keeps only the free-form walkthrough: a client-facing story, a design
-  review, screens with no verdict.
+  `vitrinka qa usertest` (start · case · verdict · finish; shots ride `board
+  capture` in between). This skill keeps only the free-form walkthrough: a
+  client-facing story, a design review, screens with no verdict.
 - **Resolve the target BEFORE dispatching the publisher** (`vitrinka task
-  resolve-qa`). Exit 4 = no qa task: publish UNLINKED and say so in the
-  hand-back. Never create a qa task or a journey from a publish.
+  resolve-qa --json`). Exit 4 = no qa task: publish UNLINKED and say so in
+  the hand-back; `qa.pending` = the plan waits on its reviewer — say so,
+  never file a second plan. Never create a qa task or a journey from a
+  publish.
 - **The publisher stamps the board once** (`add_task_ref {kind: "board",
   meta: {board: true}}`) and links sections to `journey` children by
   `fields.key`, else EXACT title; an unmatched section is listed under
   `warnings`, never force-matched.
 - **Verdicts are never a walkthrough's** — a finding worth a verdict is an
   exploratory case whose `finish` files the bug.
-- On a bound task the hand-back is the handoff skill's `rendered` block.
+- On a bound task the hand-back is `vitrinka-pm:handoff`'s `rendered` block.
 
 ## Gotchas
 
-- `VITRINKA_TOKEN` or the OS keyring is always required. Each capture
-  uploads only its new files and the board fills live; a failed upload writes
-  `.vitrinka/screenshots/.vitrinka-offline` (diagnosis + fix) — warn once,
-  keep capturing; the next push sends only what is missing.
+- Each capture uploads only its new files and the board fills live; a failed
+  upload writes `.vitrinka/screenshots/.vitrinka-offline` (diagnosis + fix)
+  — warn once, keep capturing; the next push sends only what is missing.
 - Desktop app: test the `~/.config/vitrinka/desktop-app` flag file, never
   probe /Applications.

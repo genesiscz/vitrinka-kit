@@ -9,8 +9,10 @@ cap beside it. Never delete a placeholder without filling it.
 it fits. No "continued" section, appendix, or link to a longer version — a
 feature that needs more needs splitting into two epics.
 
-Filename: `<topic>-brief.md`; a later pass uploads the next VERSION of the
-same filename (`upload_task_file` keeps the lineage), never a second file.
+Filename: the compose reply's `ref.meta.filename` (`<epic-slug>-brief.md`),
+uploaded with `versionOf: <ref.id>`; a later pass uploads the next VERSION of
+the same lineage (`upload_task_file` / `vitrinka task upload --kind brief
+--version-of`), never a second file.
 
 ```markdown
 # <Topic> — Brief

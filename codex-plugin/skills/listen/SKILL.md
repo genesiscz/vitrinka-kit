@@ -5,18 +5,21 @@ metadata:
   vitrinka-contract: "2026-09-15"
 ---
 
-# /vitrinka:listen — the listening session
+# listen — the listening session
 
 You are the **worker half of an audit loop**: the user annotates their app's
 screens on a vitrinka board; you fix each annotation in THIS repository,
-attach visual proof, and go back to listening.
+attach visual proof, and go back to listening. A human invokes it as
+`/listen` (`/vitrinka:listen` when another command claims the name; `$listen`
+in Codex).
 
 `vitrinka work watch` is a persistent process that long-polls the work queue,
-leases the scope, and prints ONE line per NEW item.
-`docs {topic: "guide:listening"}` (CLI `vitrinka docs guide:listening`) is
-the ONE ladder every listening skill follows: a native background Monitor,
-the `vitrinka work listen --harness <name>` host, or — with neither — one
-scoped drain. Never keep the model turn alive on empty polls. Pick the highest rung this harness offers,
+leases the scope, and prints ONE line per NEW item. `docs {topic:
+"guide:listening"}` (CLI `vitrinka docs guide:listening`) is the ONE ladder
+every listening skill follows — a native background Monitor on `exec
+vitrinka work watch`, the `vitrinka work listen --harness <name>` host, or
+one scoped drain — with the exact Monitor call, the rung-picking order and
+the one-line announcement. Pick the highest rung this harness offers,
 announce it once; the rest of this file applies unchanged on every rung. A
 "monitor line" below means the line however it reaches you.
 
@@ -33,10 +36,10 @@ The server enforces **at most one live listener per scope** — the same board
 - The listener *leases* its scope through the `vitrinka work watch` long-poll
   — that long-poll IS the heartbeat. A clean stop (the monitor torn down, the
   host interrupted, the session exiting) releases the lease immediately and
-  reverts any work it had claimed; a killed process's lease lapses on the
-  ~90s TTL. The watch self-terminates when orphaned (it watches its own
-  parent). The lease records the harness and the rung, shown beside the
-  board's listening indicator.
+  reverts any work it had claimed; a killed process's lease lapses on its
+  TTL. The watch self-terminates when orphaned (it watches its own parent).
+  The lease records the harness and the rung, shown beside the board's
+  listening indicator.
 - **Newest wins (same machine):** if another session ON THIS MACHINE holds
   the scope, your `vitrinka work watch` claim displaces it automatically —
   no 409, nothing to surface. The displaced session's monitor emits one `⚠
@@ -49,16 +52,17 @@ The server enforces **at most one live listener per scope** — the same board
   cross-machine live lease is never stolen.
 - `--takeover` steals only an **expired** lease (a crashed/hard-killed
   session). Same-machine live leases need no flag; cross-machine live ones
-  can never be stolen.
+  can never be stolen. `vitrinka doctor` shows who holds a scope.
 
 Scope flags (all optional): `--board <slug>` (one board), `--project <p>
 --branch <b>` (override the inferred repo scope), `--all` (the firehose —
 claims no scope; only for a read-only overview session, never to work items
 another session owns).
 
-All scope resolves *within the token's workspace* — `wait_for_work`/`list {kind:"work"}`
-scoping by `{board}` or `{project, branch}` only ever sees that workspace's
-work.
+All scope resolves *within the token's workspace* — `wait_for_work` /
+`list {kind:"work"}` scoping by `{board}` or `{project, branch}` only ever
+sees that workspace's work; another workspace of the organisation is
+`<workspace>/<slug>` or `<workspace>/<project>`.
 
 ## Preconditions — check once, then arm
 
@@ -66,55 +70,23 @@ work.
    rev-parse --show-toplevel` works and the project matches what capsules
    will reference). Clearly not an app repo → say so and stop.
 2. The `vitrinka` MCP tools are available (`wait_for_work`, `set_status`,
-   `reply`, `attach_after`, `get {kind:"capsule"}`). If not, tell the user to run
-   `vitrinka setup` (or the manual form: `claude mcp add --scope user
-   --transport http vitrinka <origin>/mcp`, then `/mcp` → vitrinka →
-   authenticate inside Claude Code) — ONE secret-free user-scope HTTP entry
-   with OAuth; one sign-in covers every repo and every workspace of your
-   organisation, and a call naming a project lands in the workspace that
-   knows it. A project-scope `.mcp.json` entry is a leftover (it costs a
-   sign-in per repo) — `vitrinka setup` removes it; Cursor, OpenCode, VS Code
-   and Gemini CLI keep their own project files. To act in ANOTHER workspace
-   of the organisation, or on a workspace-level tool, spell the project
-   `<workspace>/<project>` (a board `<workspace>/<slug>`).
-3. Your rung, per `guide:listening`: the `Monitor` tool exists →
-   rung 1; `VITRINKA_LISTEN_HOST` is set → rung 2 (the host already leases
-   the scope — arm nothing); otherwise rung 3.
+   `reply`, `attach_after`, `get {kind:"capsule"}`) and the `vitrinka`
+   binary is on PATH. Either missing → `vitrinka setup` registers both
+   (`vitrinka doctor` names what is missing); never hand-write a
+   registration.
+3. Your rung, per `guide:listening`: the `Monitor` tool exists → rung 1;
+   `VITRINKA_LISTEN_HOST` is set → rung 2 (the host already leases the
+   scope — arm nothing); otherwise rung 3 (drain once with `wait_for_work
+   {…scope, timeoutSec: 1}`, end on idle, name `vitrinka work listen
+   --harness <name>` as the continuous path). Never claim a listener is
+   active when none is armed.
 
-## Arm the listener
-
-Use the `vitrinka` binary on PATH (installed by `vitrinka setup` / `npm i -g
-@vitrinka/cli`); not on PATH → `go run ./cmd/vitrinka work watch` from a
-vitrinka repo checkout.
-
-**Rung 1 — arm the monitor** exactly as the ladder specifies (pass both
-`timeout_ms` and `persistent`):
-
-```
-Monitor({
-  command: "exec vitrinka work watch --keepalive 0",   // auto-scopes to repo+branch; add --board <slug> for a board
-  persistent: true,
-  timeout_ms: 300000,
-  description: "vitrinka work queue (<repo/branch|board|all>)"
-})
-```
-
-**The `exec` is load-bearing — never drop it.** Then, in the SAME turn,
-announce the rung-1 line and **END THE TURN**: do not loop, do not poll, do
-not sleep.
-
-**Rung 2 — hosted**: arm nothing. Announce the rung-2 line and END THE TURN
-— the next work item arrives as a prompt.
-
-**Rung 3 — one-shot drain**: announce the missing background wake path,
-drain using `wait_for_work {…scope, timeoutSec: 1}`, then end on idle.
-Name `vitrinka work listen --harness <name>` as the continuous-listening
-path. Never claim a listener is active when none is armed.
-
-**Default is auto-scope** — no `--board` needed. If the watch's FIRST output
-line is `⚠ listener already active (live, another machine) …` (exit 2),
-surface which session owns it and stop. If it later emits `… taken over by …
-— standing down`, acknowledge in one line and do not re-arm.
+Arm it exactly as the guide shows (rung 1: `exec vitrinka work watch
+--keepalive 0`, `--board <slug>` for a board — **the `exec` is
+load-bearing**), announce the rung's one line in the SAME turn and **END
+THE TURN**: do not loop, do not poll, do not sleep. If the watch's FIRST
+output line is `⚠ listener already active (live, another machine) …` (exit
+2), surface which session owns it and stop.
 
 ## On a work line — drain the queue
 
@@ -124,15 +96,15 @@ annotation. Other line shapes:
 - `№<id> [answer] <board>: <question> → <answer>` — an ANSWERED BOARD
   QUESTION (a "Send to Claude" dispatch): `wait_for_work` returns it in
   `choices[]` alongside `work[]`; record the decision (answer + any `note`,
-  or a multi-select's per-pick `notes`)
-  per the brainstorming skill, not as a code-fix item. Choices are delivered
-  exactly once — act on the drained `choices[]` in this turn (or re-read via
-  `get {kind:"questions", board}`, the durable record, if lost).
+  or a multi-select's per-pick `notes`) per the brainstorming skill, not as
+  a code-fix item. Choices are delivered exactly once — act on the drained
+  `choices[]` in this turn (or re-read via `get {kind:"questions", board}`,
+  the durable record, if lost).
 - `№<id> [session] <project>: testing session started — …` — the user began
   a RECORDER SESSION on your project (the `sessions[]` lane): the № is a
-  session id (`get {kind:"session"}`, not `get {kind:"annotation"}`), and the move is
-  `/vitrinka:pair`'s preflight and loop; there is no annotation to service
-  yet.
+  session id (`get {kind:"session"}`, not `get {kind:"annotation"}`), and
+  the move is `vitrinka-qa:pair`'s preflight and loop; there is no
+  annotation to service yet.
 - `№<id> [ask] <board>: <question> → <prompt>` — an ASK-AI INFO REQUEST, in
   `wait_for_work`'s `asks[]`. Service asks FIRST (a ● working popover is
   open on their screen): stream `answer_ask {id, text, partial:true}` in 2-4
@@ -147,7 +119,7 @@ When re-invoked by a line (or a batch):
    returned capsule serially, oldest first. Pass the SAME scope the listener
    uses: `{ board }` for a board listener, `{ project, branch }` for the
    auto-scoped repo listener. `timeoutSec: 1` (NOT 50) — the watch is what
-   waits. Rung 3 performs only the scoped drain.)
+   waits. Rung 3 performs only the scoped drain.
 2. On idle, **end the turn on every rung** — an armed monitor stays
    armed (`persistent`), the host keeps its loop. Never disarm it yourself.
 
@@ -169,9 +141,9 @@ nobody is viewing a board. Never enable it just to keep an idle model busy.
 1. **Claim it**: `set_status {id, status: "working"}` — the board pin flips
    amber live. A 409 (cancelled / already claimed) → skip silently.
 2. **Announce the plan**: `reply` with ONE terse line.
-3. **Understand**: the capsule has the ask, the region, and a crop URL —
-   fetch the crop image if seeing the region matters. `get {kind:"capsule", id}`
-   re-fetches the latest brief after user edits.
+3. **Understand**: the capsule has the ask, the region, and a crop — see it
+   with `get_card_image {annotation: id}` if the region matters. `get
+   {kind:"capsule", id}` re-fetches the latest brief after user edits.
 4. **Fix it in this repo.** The annotated ask only — no drive-by refactors.
    Commit with a conventional message referencing №id.
 5. **Prove it**: regenerate the screen(s) and push a new set the way this
@@ -224,9 +196,6 @@ no background listener to claim is retrying.
   If asked which to pick: `Exit anyway` unless they specifically want the
   queue held.
 - **Never disarm and re-arm** to "refresh" it.
-- Stale leases from an older crash are visible in `vitrinka doctor` and
-  cleared by `vitrinka doctor --fix` — offer that if a scope seems held by
-  nobody.
 
 ## Rules
 
@@ -241,10 +210,5 @@ no background listener to claim is retrying.
   `@eve` turns go to Eve, vitrinka's AI reviewer).
 - Context grown unwieldy after many fixes: finish the current item, tell the
   user to restart the listener, and stop.
-
-## Update notices
-
-Any `vitrinka` command may print `update available X → Y · run: vitrinka
-update` on stderr. Relay it to the user ONCE and offer to run `vitrinka
-update`. Never run the update unprompted, never repeat the offer in the same
-session.
+- `update available X → Y · run: vitrinka update` on stderr: relay it ONCE
+  and offer `vitrinka update`; never run it unprompted.

@@ -17,7 +17,7 @@ Two ways in:
 ## Path (a) — import repo truth (refreshable)
 
 The card stores `payload.source = {kind, ref, rev, blob}`; a later ↻ (or
-`/refresh`) re-parses it → new semantics by stable ids → relayout →
+`refresh`) re-parses it → new semantics by stable ids → relayout →
 overrides survive.
 
 1. **Detect** the source:
@@ -28,23 +28,22 @@ overrides survive.
    - `schema.sql` / `*.ddl` / a migrations dir's CREATE TABLE dump → `kind:
      sqlddl` (entity nodes + FK crow's-foot edges; Postgres/SQLite dialects)
    - a live Postgres → `kind: pgschema` via `vitrinka board diagram schema push`
-2. **Import via the CLI** (kind auto-detected from name/content):
+2. **Import** — the MCP door `import {board, kind, source: <raw file
+   contents>, ref: <path>, rev, title?, section?}` (the server places the
+   card), or the CLI, which reads the file and auto-detects the kind:
    ```bash
-   vitrinka board diagram import docker-compose.yml --board <slug> --kind auto --title "Services"
+   vitrinka board diagram import docker-compose.yml --board <slug> --title "Services" --rev "$(git rev-parse --short HEAD)"
    ```
-   Raw: `POST /api/v1/boards/{slug}/import` `{kind, source, ref, rev?,
-   title?, x?, y?}` (`Authorization: Bearer` fed via stdin — never inline the
-   token; `printf 'Authorization: Bearer %s' "$TOKEN" | curl -H @- …`).
-   `x`/`y` omitted = free placement. Parse failure is a loud 400 naming the
-   offending line/element — never a partial import.
+   Parse failure is a loud 400 naming the offending line/element — never a
+   partial import.
 3. **Stamp the revision**: `rev` = the git SHA (`git rev-parse --short
    HEAD`), `ref` = the filename/url.
 4. **Live Postgres**: `vitrinka board diagram schema push --db postgres://…
    --board <slug>` — introspects LOCALLY via `psql`; the connection string
-   never leaves the machine, only the parsed schema JSON is posted.
-5. **Refresh** after the source changes: `POST /api/v1/cards/{id}/refresh
-   {source:<new contents>, rev:<new SHA>}` (or `{}` to re-parse the stored
-   blob). Ids derive from source names (table, `method+path`, service) so
+   never leaves the machine, only the parsed schema JSON is uploaded.
+5. **Refresh** after the source changes: `refresh {card: <id>, source: <new
+   contents>, rev: <new SHA>}` (omit `source` to re-parse the stored blob).
+   Ids derive from source names (table, `method+path`, service) so
    overrides re-apply; a dropped table loses its node, a new one appears,
    pins stay put.
 
@@ -107,7 +106,7 @@ Full JSON examples (service architecture with lanes/groups, an ER pair where
 `fk:"users.id"` alone draws the crow's-foot, mermaid passthrough — a payload
 carrying `"mermaid":"<source>"` and no `lanes` converts server-side, loud
 error naming any unsupported line): `docs {topic:"element:diagram"}` /
-`vitrinka docs diagram`.
+`vitrinka docs element:diagram`.
 
 ## Verify, then iterate — the quality loop
 
@@ -147,8 +146,8 @@ up" by hand.
 - **Re-compose** the semantics with `update_cards` (whole-payload replace) —
   the engine re-lays-out and human `overrides` re-apply by id. Keep ids
   stable across updates.
-- **Imported cards refresh** via `/refresh`, not `update_cards` — the source
-  is the truth.
+- **Imported cards refresh** via `refresh {card}`, not `update_cards` — the
+  source is the truth.
   pin: internal/web/import_api_test.go#TestRefreshKeepsOverridesAndReparses
 - **Never author `payload.geo` or coordinates.** `render =
   serverLayout(payload) ⊕ overrides`. A box in a specific place is a human
