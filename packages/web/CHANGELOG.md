@@ -1,5 +1,10 @@
 # @vitrinka/web
 
+## 0.10.1
+
+- Rebuilt from the cleaned repository history, with no behaviour change.
+  0.10.0 is withdrawn from npm; upgrade to 0.10.1.
+
 ## 0.10.0
 
 - **A report says where it came from.** Report a problem takes a
