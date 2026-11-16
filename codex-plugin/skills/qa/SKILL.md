@@ -1,6 +1,6 @@
 ---
 name: qa
-description: "Use for vitrinka QA from the app's repo — 'user test this', 'QA this like a user', 'run the tests and publish' (qa usertest); 'review the board', 'review this journey', 'have Eve review it' (qa review); 'process the session', 'pending sessions', 'vitrinka qa session archive|continue' (qa sessions)."
+description: "Use for vitrinka QA from the app's repo: test like a user (usertest), review a board or journey (review), or process recorded sessions (sessions)."
 metadata:
   vitrinka-contract: "2026-09-15"
 ---

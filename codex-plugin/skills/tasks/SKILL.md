@@ -1,6 +1,6 @@
 ---
 name: tasks
-description: "Use when working a project's task engine or release from the repo — '/tasks [list|intake|file|epic|rule|release]', 'file a task', 'find the X epic', 'plan the epic', 'triage intake', 'sprint start', 'add an automation rule', 'cut the release', 'write the release notes'."
+description: "Use to work a project's task engine or release from the repo: list, file, triage intake, find or plan an epic, start a sprint, add a rule, cut a release, write notes."
 metadata:
   vitrinka-contract: "2026-09-15"
 ---
