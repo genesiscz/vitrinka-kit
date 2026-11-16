@@ -1,6 +1,6 @@
 ---
 name: work
-description: "Use when a vitrinka task id or URL arrives in the prompt (work pickup), when work on a bound task ends or the Stop gate asks for a hand-back (work handoff), and when a 'later', 'out of scope' or 'someone should decide' thought appears mid-task (work spot)."
+description: "Use when a vitrinka task id or URL arrives (pickup), when bound work ends or the Stop gate asks (handoff), or when a 'later', out-of-scope or someone-should-decide thought appears (spot)."
 metadata:
   vitrinka-contract: "2026-09-15"
 ---
